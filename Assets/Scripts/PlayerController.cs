@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
-public class CharacterController : MonoBehaviour, IAttackFrameReceiver
+public class PlayerController : MonoBehaviour, IAttackFrameReceiver
 {
     private enum State
     {
@@ -17,24 +17,49 @@ public class CharacterController : MonoBehaviour, IAttackFrameReceiver
     public Animator animator;
     public GameObject hitEffectPrefab;
     private InteractableObject targetInteractable;
-    private CharacterData targetCharacterData;
-    private CharacterData characterData;
+    public CharacterData targetCharacterData;
 
-    private bool clearPostAttack;
-
+    public CharacterData characterData;
+    public static PlayerController instance;
+    private bool isDead;
+    private void Awake()
+    {
+        instance = this;
+    }
     // Start is called before the first frame update
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
         characterData = GetComponent<CharacterData>();
         characterData.Init();
+        characterData.OnDamage += () =>
+        {
+            animator.SetTrigger("Hit");
+        };
     }
 
     // Update is called once per frame
     void Update()
     {
-        Vector3 pos = transform.position;
+        if (isDead)
+            return;
+        if (characterData.currentStat.hp == 0)
+        {
+            animator.SetTrigger("Dead");
+            agent.isStopped = true;
+            agent.ResetPath();
+            isDead = true;
+            return;
+        }
         Ray screenRay = Camera.main.ScreenPointToRay(Input.mousePosition);
+        if (Input.GetMouseButtonDown(0))
+        {
+            if (currentState != State.ATTACKING)
+            {
+                targetCharacterData = null;
+            }
+        }
+
         if (targetCharacterData != null)
         {
             if (targetCharacterData.currentStat.hp == 0)
@@ -42,17 +67,7 @@ public class CharacterController : MonoBehaviour, IAttackFrameReceiver
             else
                 CheckAttack();
         }
-        if (Input.GetMouseButtonDown(0))
-        {
-            if (currentState != State.ATTACKING)
-            {
-                targetCharacterData = null;
-            }
-            else
-            {
-                clearPostAttack = true;
-            }
-        }
+
 
         if (currentState != State.ATTACKING)
         {
@@ -120,6 +135,7 @@ public class CharacterController : MonoBehaviour, IAttackFrameReceiver
                 if (characterData.CanAttackTarget(targetCharacterData))
                 {
                     currentState = State.ATTACKING;
+                    characterData.AttackTriggered();
                     animator.SetTrigger("Attack");
                 }
             }
@@ -134,7 +150,6 @@ public class CharacterController : MonoBehaviour, IAttackFrameReceiver
     {
         if (targetCharacterData == null)
         {
-            clearPostAttack = false;
             return;
         }
         if (characterData.CanAttackReach(targetCharacterData))
@@ -142,11 +157,6 @@ public class CharacterController : MonoBehaviour, IAttackFrameReceiver
             characterData.Attack(targetCharacterData);
             Vector3 attackPos = targetCharacterData.transform.position + transform.up * 0.5f;
             Instantiate(hitEffectPrefab, attackPos, Random.rotationUniform);
-        }
-        if (clearPostAttack)
-        {
-            clearPostAttack = false;
-            targetCharacterData = null;
         }
         currentState = State.DEFAULT;
     }

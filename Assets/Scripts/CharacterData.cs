@@ -1,7 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
+using System;
 public class CharacterData : InteractableObject
 {
     public string characterName;
@@ -11,10 +11,13 @@ public class CharacterData : InteractableObject
         public int hp;
         public int atk;
         public int def;
+        public int agi;
     }
 
     public Stat defaultStat;
     public Stat currentStat;
+    public Action OnDamage;
+    private float attackCoolDown;
 
     public void Init()
     {
@@ -24,6 +27,10 @@ public class CharacterData : InteractableObject
     public bool CanAttackTarget(CharacterData target)
     {
         if (target.currentStat.hp == 0)
+            return false;
+        if (!CanAttackReach(target))
+            return false;
+        if (attackCoolDown > 0)
             return false;
         return true;
     }
@@ -39,19 +46,23 @@ public class CharacterData : InteractableObject
         target.Damage(damage);
     }
 
+    public void AttackTriggered()
+    {
+        attackCoolDown = 2 - (currentStat.agi * 0.001f);
+    }
+
     public void Damage(int damage)
     {
         currentStat.hp = Mathf.Max(currentStat.hp - damage, 0);
         DamageUI.instance.NewDamage(damage, transform.position);
-        if (currentStat.hp == 0)
+        OnDamage?.Invoke();
+    }
+
+    private void Update()
+    {
+        if(attackCoolDown > 0)
         {
-            Death();
+            attackCoolDown -= Time.deltaTime;
         }
     }
-
-    public void Death()
-    {
-
-    }
-
 }
