@@ -18,7 +18,7 @@ public class PlayerController : MonoBehaviour, IAttackFrameReceiver
     public GameObject hitEffectPrefab;
     private InteractableObject targetInteractable;
     public CharacterData targetCharacterData;
-
+    public Loot targetLoot;
     public CharacterData characterData;
     public static PlayerController instance;
     private bool isDead;
@@ -36,6 +36,7 @@ public class PlayerController : MonoBehaviour, IAttackFrameReceiver
         {
             animator.SetTrigger("Hit");
         };
+        characterData.inventory.AddItem(1);
     }
 
     // Update is called once per frame
@@ -57,9 +58,13 @@ public class PlayerController : MonoBehaviour, IAttackFrameReceiver
             if (currentState != State.ATTACKING)
             {
                 targetCharacterData = null;
+                targetLoot = null;
             }
         }
-
+        if (targetLoot != null)
+        {
+            CheckInteractableRange();
+        }
         if (targetCharacterData != null)
         {
             if (targetCharacterData.currentStat.hp == 0)
@@ -74,16 +79,25 @@ public class PlayerController : MonoBehaviour, IAttackFrameReceiver
             ObjectsRaycasts(screenRay);
             if (Input.GetMouseButton(0))
             {
-                if (targetCharacterData == null)
+                if (targetLoot == null && targetCharacterData == null)
                 {
-                    CharacterData data = targetInteractable as CharacterData;
-                    if (data != null)
+                    Loot loot = targetInteractable as Loot;
+                    if (loot != null)
                     {
-                        targetCharacterData = data;
+                        targetLoot = loot;
+                        agent.SetDestination(targetLoot.transform.position);
                     }
                     else
                     {
-                        MoveCheck(screenRay);
+                        CharacterData data = targetInteractable as CharacterData;
+                        if (data != null)
+                        {
+                            targetCharacterData = data;
+                        }
+                        else
+                        {
+                            MoveCheck(screenRay);
+                        }
                     }
                 }
             }
@@ -93,14 +107,27 @@ public class PlayerController : MonoBehaviour, IAttackFrameReceiver
     private void ObjectsRaycasts(Ray screenRay)
     {
         bool somethingFound = false;
-        RaycastHit[] hits = Physics.SphereCastAll(screenRay, 1f, 1000f, LayerMask.GetMask("Target"));
+        RaycastHit[] hits = Physics.SphereCastAll(screenRay, 1f, 1000f, LayerMask.GetMask("Interactable"));
         if (hits.Length > 0)
         {
-            CharacterData data = hits[0].collider.GetComponent<CharacterData>();
-            if (data != null)
+            Loot loot = hits[0].collider.GetComponent<Loot>();
+            if (loot != null)
             {
-                targetInteractable = data;
+                targetInteractable = loot;
                 somethingFound = true;
+            }
+        }
+        else
+        {
+            hits = Physics.SphereCastAll(screenRay, 1f, 1000f, LayerMask.GetMask("Target"));
+            if (hits.Length > 0)
+            {
+                CharacterData data = hits[0].collider.GetComponent<CharacterData>();
+                if (data != null)
+                {
+                    targetInteractable = data;
+                    somethingFound = true;
+                }
             }
         }
         if (somethingFound == false)
@@ -165,5 +192,18 @@ public class PlayerController : MonoBehaviour, IAttackFrameReceiver
     {
         agent.ResetPath();
         agent.velocity = Vector3.zero;
+    }
+
+    private void CheckInteractableRange()
+    {
+        if (currentState == State.ATTACKING)
+            return;
+        float distance = Vector3.Distance(transform.position, targetLoot.transform.position);
+        if (distance < 1.5f)
+        {
+            StopAgent();
+            targetLoot.Pickup(characterData);
+            targetLoot = null;
+        }
     }
 }

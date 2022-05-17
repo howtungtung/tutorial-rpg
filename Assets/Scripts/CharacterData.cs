@@ -17,11 +17,13 @@ public class CharacterData : InteractableObject
     public Stat defaultStat;
     public Stat currentStat;
     public Action OnDamage;
+    public Inventory inventory = new Inventory();
     private float attackCoolDown;
 
     public void Init()
     {
         currentStat = defaultStat;
+        inventory.Init(this);
     }
 
     public bool CanAttackTarget(CharacterData target)
